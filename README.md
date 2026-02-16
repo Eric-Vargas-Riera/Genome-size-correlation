@@ -5,7 +5,9 @@ This repository contains the Python script used to compute Pearson correlations 
 *The script in this repository has been completly generated with IA (Claude Sonnet 4.5)*
 
 Author: Èric Vargas Riera
+
 Course: Genomics
+
 Year: 2026
 
 
