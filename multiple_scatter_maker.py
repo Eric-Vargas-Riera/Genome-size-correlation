@@ -97,30 +97,30 @@ def plot_scatter_with_regression(ax, x_data, y_data, fish_types, x_label, y_labe
 
 try:
     genome_col = next((col for col in df.columns if 'genome' in col.lower() and 'size' in col.lower()), None)
-    intron_length_col = next((col for col in df.columns if 'intron' in col.lower() and 'length' in col.lower()), None)
+    gene_size_col = next((col for col in df.columns if 'gene' in col.lower() and 'real' in col.lower()), None)
+    exon_count_col = next((col for col in df.columns if 'exon' in col.lower() and 'count' in col.lower()), None)
     intron_count_col = next((col for col in df.columns if 'intron' in col.lower() and 'count' in col.lower()), None)
-    gene_count_col = next((col for col in df.columns if 'gene' in col.lower() and 'count' in col.lower()), None)
     
-    if not all([genome_col, intron_length_col, intron_count_col, gene_count_col]):
+    if not all([genome_col, gene_size_col, exon_count_col, intron_count_col]):
         print("Error: No se pudieron encontrar todas las columnas necesarias.")
         sys.exit(1)
     
     genome_size = df[genome_col].values
-    intron_length = df[intron_length_col].values
+    gene_size = df[gene_size_col].values
+    exon_count = df[exon_count_col].values
     intron_count = df[intron_count_col].values
-    gene_count = df[gene_count_col].values
     fish_type = df['Type'].values
     
-    plot_scatter_with_regression(axes[0], genome_size, intron_length, fish_type,
-                                 'Genome Size (Mb)', 'Intron Length (bp)',
+    plot_scatter_with_regression(axes[0], genome_size, gene_size, fish_type,
+                                 'Genome Size (Mb)', 'Gene Size (bp)',
                                  '', show_xlabel=False)
     
-    plot_scatter_with_regression(axes[1], genome_size, intron_count, fish_type,
+    plot_scatter_with_regression(axes[1], genome_size, exon_count, fish_type,
+                                 'Genome Size (Mb)', 'Exon Count',
+                                 '', show_xlabel=False)
+    
+    plot_scatter_with_regression(axes[2], genome_size, intron_count, fish_type,
                                  'Genome Size (Mb)', 'Intron Count',
-                                 '', show_xlabel=False)
-    
-    plot_scatter_with_regression(axes[2], genome_size, gene_count, fish_type,
-                                 'Genome Size (Mb)', 'Gene Count',
                                  '', show_xlabel=True)
     
     plt.tight_layout()
