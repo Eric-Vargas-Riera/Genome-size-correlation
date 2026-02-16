@@ -157,10 +157,10 @@ Example 2: CSV with comma delimiter
 python fish_scatter_plots.py fish_data.csv -d "," -o results.png
 
 Example 3: View help and then run
-# Show help first
+Show help first
 python fish_scatter_plots.py --help
 
-# Then run
+Then run
 python fish_scatter_plots.py
 
 📄 Output
