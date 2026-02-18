@@ -1,0 +1,80 @@
+# Multiple Boxplot - Genomic Variables Comparison
+Description
+Python script for generating multiple boxplots comparing genomic variables between two species groups: Teleostei and Pleuronectiformes. The script performs Welch's t-test (t-test with unequal variances) for each variable and displays statistical significance on the plots.
+
+Features
+✅ Multiple boxplot visualization (2x2 layout)
+✅ 4 genomic variables comparison:
+
+Genome Size (Mb)
+Gene size Real
+Exons size real
+Intron size real
+✅ Statistical analysis: Welch's t-test (unequal variances)
+✅ Significance indicators:
+
+** for p < 0.01 (very significant)
+* for p < 0.05 (significant)
+ns for p ≥ 0.05 (not significant)
+✅ Two species groups with different colors
+✅ Customizable text configuration - all labels and titles in one place
+✅ Command-line arguments for easy execution
+✅ Statistical summary printed to console
+✅ High-resolution output (300 DPI)
+
+Requirements
+Installation
+Usage
+Basic Command
+Arguments
+-i, --input (required): Path to input CSV file with genomic data
+-o, --output (optional): Path to output image file (default: multiple_boxplot.png)
+Example
+Input CSV Format
+The CSV file must follow this structure:
+
+Row 1: Species group (Teleost or Pleuronectiformes)
+Row 2: Individual species names
+Subsequent rows: Variable name in column 1, values in following columns
+
+Example:
+Important:
+
+Use semicolon (;) as separator
+Decimal numbers can use comma (,) - will be converted automatically
+Variable names must match exactly (case-sensitive)
+Text Configuration
+All text elements (titles, labels, legends) can be customized by modifying the TEXT_CONFIG dictionary at the beginning of the create_multiple_boxplots() function (lines ~113-165):
+
+Output
+Visual Output
+Format: PNG image (or specified format)
+Resolution: 300 DPI
+Layout: 2x2 grid with 4 boxplots
+Features:
+Color-coded by species (blue for Teleostei, red for Pleuronectiformes)
+P-value displayed in subplot titles
+Statistical significance markers (brackets + asterisks)
+Mean values shown as yellow diamonds
+Legend at the bottom
+Console Output
+Statistical summary including:
+
+Sample size (n) for each group
+Mean values
+Standard deviation (SD)
+P-value with significance indication
+Example:
+
+Statistical Method
+The script uses Welch's t-test (scipy.stats.ttest_ind with equal_var=False), which is appropriate for comparing two groups with potentially unequal variances and sample sizes.
+
+Customization Options
+Figure size: Modify figsize=(14, 10) in line ~178
+Colors: Change the colors dictionary in line ~181
+Box width: Adjust widths=0.6 in line ~217
+DPI: Change dpi=300 in line ~273
+Text configuration: Edit TEXT_CONFIG dictionary (lines ~113-165)
+
+License
+Free to use and modify for academic and research purposes.
