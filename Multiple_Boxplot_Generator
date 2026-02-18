@@ -1,0 +1,385 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Multiple Boxplot - Genomic Variables Comparison
+
+Script for generating multiple boxplots comparing genomic variables
+between Teleostei and Pleuronectiformes species groups.
+Includes Welch's t-test (unequal variances) for statistical analysis.
+
+Author: Eric V
+Date: February 2026
+"""
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+import argparse
+import numpy as np
+from scipy import stats
+import sys
+
+def read_csv_data(file_path):
+    """
+    Read CSV data with specific structure.
+    
+    Args:
+        file_path (str): Path to the CSV file
+        
+    Returns:
+        tuple: (DataFrame, list of species)
+        
+    CSV Structure:
+        Row 1: Species group (Teleost/Pleuronectiformes)
+        Row 2: Individual species names
+        Following rows: Variable data
+    """
+    # Read CSV with semicolon separator
+    df = pd.read_csv(file_path, sep=';', header=None)
+    
+    # Extract species row (first row)
+    species_row = df.iloc[0, 1:].values
+    
+    # Clean and assign species
+    species = []
+    for val in species_row:
+        if pd.notna(val):
+            if 'Teleost' in str(val):
+                species.append('Teleostei')
+            elif 'Pleuronectiformes' in str(val):
+                species.append('Pleuronectiformes')
+            else:
+                # Keep previous species
+                if species:
+                    species.append(species[-1])
+                else:
+                    species.append('Unknown')
+        else:
+            # If NaN, keep previous species
+            if species:
+                species.append(species[-1])
+            else:
+                species.append('Unknown')
+    
+    return df, species
+
+def extract_variable_data(df, species, row_name):
+    """
+    Extract data for a specific variable from the dataframe.
+    
+    Args:
+        df (DataFrame): Input dataframe
+        species (list): List of species names
+        row_name (str): Name of the variable to extract
+        
+    Returns:
+        list: Cleaned numeric values for the variable
+    """
+    # Find the row corresponding to the variable
+    row_idx = None
+    for idx, row in df.iterrows():
+        if pd.notna(row[0]):
+            # Exact comparison, case-sensitive
+            cell_value = str(row[0]).strip()
+            if cell_value == row_name:
+                row_idx = idx
+                break
+    
+    if row_idx is None:
+        raise ValueError(f"Variable not found: '{row_name}'")
+    
+    # Extract values (from column 1 onwards)
+    values = df.iloc[row_idx, 1:len(species)+1].values
+    
+    # Convert to float, replacing commas with dots
+    clean_values = []
+    for val in values:
+        if pd.notna(val):
+            # Convert to string, replace comma with dot
+            val_str = str(val).replace(',', '.')
+            try:
+                clean_values.append(float(val_str))
+            except:
+                clean_values.append(np.nan)
+        else:
+            clean_values.append(np.nan)
+    
+    return clean_values
+
+def perform_welch_test(data_teleostei, data_pleuronectiformes):
+    """
+    Perform Welch's t-test (t-test with unequal variances).
+    
+    Args:
+        data_teleostei (list): Data for Teleostei group
+        data_pleuronectiformes (list): Data for Pleuronectiformes group
+        
+    Returns:
+        float: p-value from the test
+    """
+    # Filter NaN values
+    data_t = [x for x in data_teleostei if not np.isnan(x)]
+    data_p = [x for x in data_pleuronectiformes if not np.isnan(x)]
+    
+    if len(data_t) < 2 or len(data_p) < 2:
+        return np.nan
+    
+    # Welch's t-test (equal_var=False)
+    statistic, p_value = stats.ttest_ind(data_t, data_p, equal_var=False)
+    
+    return p_value
+
+def create_multiple_boxplots(file_path, output_file=None):
+    """
+    Create multiple boxplots for the specified variables.
+    
+    Args:
+        file_path (str): Path to input CSV file
+        output_file (str, optional): Path to output image file
+    """
+    # ============================================================================
+    # TEXT CONFIGURATION - Modify here to change all text labels
+    # ============================================================================
+    TEXT_CONFIG = {
+        # Main plot title
+        'main_title': '',
+        
+        # Variable names to analyze (must match CSV exactly)
+        'variables': [
+            'Genome Size (Mb)',
+            'Gene size Real',
+            'Exons size real',
+            'Intron size real'
+        ],
+        
+        # Custom titles for each subplot (if empty, uses variable name)
+        'subplot_titles': {
+            'Genome Size (Mb)': 'Genome Size',
+            'Gene size Real': 'Gene size',
+            'Exons size real': 'Exons size',
+            'Intron size real': 'Intron size'
+        },
+        
+        # Y-axis labels for each variable
+        'ylabel': {
+            'Genome Size (Mb)': 'Size (Mb)',
+            'Gene size Real': 'Size (bp)',
+            'Exons size real': 'Size (bp)',
+            'Intron size real': 'Size (bp)'
+        },
+        
+        # Species labels (for X-axis labels)
+        'species_labels': {
+            'Teleostei': 'Teleostei',
+            'Pleuronectiformes': 'Pleuronectiformes'
+        },
+        
+        # Text for p-value in titles
+        'pvalue_text': 'p-value',
+        'significant_text': '*',      # For p < 0.05
+        'very_significant_text': '**', # For p < 0.01
+        'not_significant_text': 'ns',  # For p >= 0.05
+        
+        # Significance legend (bottom of plot)
+        'legend_text': '* p < 0.05 (significant)  |  ** p < 0.01 (very significant)  |  ns = not significant',
+        
+        # Text for statistical summary in console
+        'console_title': 'STATISTICAL SUMMARY - Welch\'s t-test (unequal variances)',
+        'console_teleostei': 'Teleostei',
+        'console_pleuronectiformes': 'Pleuronectiformes',
+        'console_significant': 'SIGNIFICANT',
+        'console_not_significant': 'NOT significant'
+    }
+    # ============================================================================
+    
+    # Read data
+    df, species = read_csv_data(file_path)
+    
+    # Variables to analyze (from configuration dictionary)
+    variables = TEXT_CONFIG['variables']
+    
+    # Create figure with subplots (2x2)
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+    axes = axes.flatten()
+    
+    # Colors for each species group
+    colors = {'Teleostei': '#3498db', 'Pleuronectiformes': '#e74c3c'}
+    
+    # Create boxplot for each variable
+    for idx, var_name in enumerate(variables):
+        ax = axes[idx]
+        
+        # Extract variable data
+        values = extract_variable_data(df, species, var_name)
+        
+        # Separate data by species
+        data_by_species = {'Teleostei': [], 'Pleuronectiformes': []}
+        
+        for i, val in enumerate(values):
+            if not np.isnan(val) and i < len(species):
+                data_by_species[species[i]].append(val)
+        
+        # Perform Welch's t-test
+        p_value = perform_welch_test(
+            data_by_species['Teleostei'],
+            data_by_species['Pleuronectiformes']
+        )
+        
+        # Prepare data for boxplot
+        data_plot = []
+        labels_plot = []
+        colors_plot = []
+        
+        for sp in ['Teleostei', 'Pleuronectiformes']:
+            if data_by_species[sp]:
+                data_plot.append(data_by_species[sp])
+                labels_plot.append(TEXT_CONFIG['species_labels'][sp])
+                colors_plot.append(colors[sp])
+        
+        # Create boxplot
+        bp = ax.boxplot(data_plot, labels=labels_plot, patch_artist=True,
+                        widths=0.6, showmeans=True,
+                        meanprops=dict(marker='D', markerfacecolor='yellow', 
+                                     markeredgecolor='black', markersize=6))
+        
+        # Color boxes
+        for patch, color in zip(bp['boxes'], colors_plot):
+            patch.set_facecolor(color)
+            patch.set_alpha(0.7)
+        
+        # Configure style
+        for element in ['whiskers', 'fliers', 'medians', 'caps']:
+            plt.setp(bp[element], color='black', linewidth=1.5)
+        
+        # Title with variable name
+        title = TEXT_CONFIG['subplot_titles'].get(var_name, var_name)
+        if not np.isnan(p_value):
+            # Add significance indicator
+            if p_value < 0.01:
+                sig_marker = TEXT_CONFIG['very_significant_text']
+            elif p_value < 0.05:
+                sig_marker = TEXT_CONFIG['significant_text']
+            else:
+                sig_marker = TEXT_CONFIG['not_significant_text']
+            
+            title += f'\n{TEXT_CONFIG["pvalue_text"]}: {p_value:.4f} {sig_marker}'
+        
+        ax.set_title(title, fontsize=11, fontweight='bold', pad=10)
+        ax.set_ylabel(TEXT_CONFIG['ylabel'].get(var_name, 'Value'), fontsize=10)
+        ax.grid(axis='y', alpha=0.3, linestyle='--')
+        ax.tick_params(axis='x', labelrotation=15)
+        
+        # Add line between boxes if significant
+        if not np.isnan(p_value) and p_value < 0.05:
+            y_max = max([max(d) for d in data_plot])
+            y_min = min([min(d) for d in data_plot])
+            y_range = y_max - y_min
+            y_pos = y_max + y_range * 0.05
+            
+            ax.plot([1, 2], [y_pos, y_pos], 'k-', linewidth=1.5)
+            
+            # Add asterisk based on significance level
+            if p_value < 0.01:
+                marker_text = TEXT_CONFIG['very_significant_text']
+            elif p_value < 0.05:
+                marker_text = TEXT_CONFIG['significant_text']
+            
+            ax.text(1.5, y_pos, marker_text, ha='center', va='bottom', 
+                   fontsize=14, fontweight='bold')
+            
+            # Adjust Y-axis limits to give more space above
+            current_ylim = ax.get_ylim()
+            ax.set_ylim(current_ylim[0], y_max + y_range * 0.15)
+    
+    # Adjust layout with more spacing
+    plt.tight_layout()
+    
+    # Add main title with spacing
+    fig.suptitle(TEXT_CONFIG['main_title'], 
+                 fontsize=14, fontweight='bold', y=0.995)
+    plt.subplots_adjust(top=0.92, bottom=0.08)
+    
+    # Add significance legend with spacing
+    fig.text(0.5, 0.015, 
+             TEXT_CONFIG['legend_text'],
+             ha='center', fontsize=9, style='italic')
+    
+    # Save or show plot
+    if output_file:
+        plt.savefig(output_file, dpi=300, bbox_inches='tight')
+        print(f"\nPlot saved to: {output_file}")
+    else:
+        plt.show()
+    
+    plt.close()
+    
+    # Print statistical summary
+    print("\n" + "="*70)
+    print(TEXT_CONFIG['console_title'])
+    print("="*70)
+    
+    for var_name in variables:
+        values = extract_variable_data(df, species, var_name)
+        data_by_species = {'Teleostei': [], 'Pleuronectiformes': []}
+        
+        for i, val in enumerate(values):
+            if not np.isnan(val) and i < len(species):
+                data_by_species[species[i]].append(val)
+        
+        p_value = perform_welch_test(
+            data_by_species['Teleostei'],
+            data_by_species['Pleuronectiformes']
+        )
+        
+        print(f"\n{var_name}:")
+        print(f"  {TEXT_CONFIG['console_teleostei']}: n={len(data_by_species['Teleostei'])}, "
+              f"media={np.mean(data_by_species['Teleostei']):.2f}, "
+              f"SD={np.std(data_by_species['Teleostei'], ddof=1):.2f}")
+        print(f"  {TEXT_CONFIG['console_pleuronectiformes']}: n={len(data_by_species['Pleuronectiformes'])}, "
+              f"media={np.mean(data_by_species['Pleuronectiformes']):.2f}, "
+              f"SD={np.std(data_by_species['Pleuronectiformes'], ddof=1):.2f}")
+        
+        if not np.isnan(p_value):
+            significance = TEXT_CONFIG['console_significant'] if p_value < 0.05 else TEXT_CONFIG['console_not_significant']
+            print(f"  p-value: {p_value:.6f} ({significance})")
+        else:
+            print(f"  p-value: Not calculable")
+    
+    print("\n" + "="*70)
+
+def main():
+    """
+    Main function with command-line arguments.
+    """
+    parser = argparse.ArgumentParser(
+        description='Generate multiple boxplots comparing genomic variables between species groups'
+    )
+    
+    parser.add_argument(
+        '-i', '--input',
+        type=str,
+        required=True,
+        help='Input CSV file with genomic data'
+    )
+    
+    parser.add_argument(
+        '-o', '--output',
+        type=str,
+        default='multiple_boxplot.png',
+        help='Output image file path (default: multiple_boxplot.png)'
+    )
+    
+    args = parser.parse_args()
+    
+    # Execute main function
+    try:
+        create_multiple_boxplots(args.input, args.output)
+    except FileNotFoundError:
+        print(f"Error: File not found {args.input}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        sys.exit(1)
+
+if __name__ == "__main__":
+    main()
